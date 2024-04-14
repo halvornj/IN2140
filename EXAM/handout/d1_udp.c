@@ -13,22 +13,81 @@
 
 #include "d1_udp.h"
 
+#define D1_UDP_PORT 2311
+
 D1Peer* d1_create_client( )
 {
-    /* implement this */
-    return NULL;
+    D1Peer* peer = (D1Peer*)malloc( sizeof(D1Peer) );
+    if( peer == NULL ){
+        perror( "malloc" );
+        return NULL;
+    }
+    peer -> socket = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if( peer -> socket < 0 ){
+        perror( "socket" );
+        free( peer );
+        return NULL;
+    }
+
+    struct sockaddr_in addr;
+    struct in_addr ip_addr;
+    addr.sin_family = AF_INET;
+    /*defaults to port 2311, todo default to 0, so long as htons() doesn't make a big stink*/
+    addr.sin_port = htons(D1_UDP_PORT);
+
+    int wc;
+    wc = inet_pton(AF_INET, "0.0.0.0", &ip_addr.s_addr);
+    /*ip addr error handling*/
+    if( wc == 0 ){
+        fprintf( stderr, "inet_pton failed: invalid address\n" );
+        close( peer -> socket );
+        free( peer );
+        return NULL;
+    }
+    if(wc < 0){
+        perror("inet_pton");
+        close(peer -> socket);
+        free(peer);
+        return NULL;
+    }
+    addr.sin_addr = ip_addr;
+
+    peer -> addr = addr;
+    peer -> next_seqno = 0;
+    return peer;
 }
 
 D1Peer* d1_delete( D1Peer* peer )
 {
-    /* implement this */
+    //surely it isn't this easy??
+    //do i free the peer.addr as well? but theyre not pointers theyre structs
+    if( peer != NULL ){
+        close( peer -> socket );
+        free( peer );
+    }
+
     return NULL;
 }
 
 int d1_get_peer_info( struct D1Peer* peer, const char* peername, uint16_t server_port )
 {
-    /* implement this */
-    return 0;
+    struct in_addr ip_addr;
+    int wc;
+    wc = inet_pton(AF_INET, peername, &ip_addr.s_addr);
+    /*ip addr error handling*/
+    if( wc == 0 ){
+        fprintf( stderr, "inet_pton failed: invalid address\n" );
+        return 0;
+    }
+    if(wc < 0){
+        perror("inet_pton");
+        return 0;
+    }
+    /*addr should be good*/
+    peer-> addr.sin_addr = ip_addr;
+    peer-> addr.sin_port = htons(server_port);
+    return 1;
 }
 
 int d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz )
