@@ -92,7 +92,7 @@ int d1_get_peer_info( struct D1Peer* peer, const char* peername, uint16_t server
 
 int d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz )
 {
-    /* implement this */
+
     return 0;
 }
 
@@ -115,6 +115,20 @@ int d1_send_data( D1Peer* peer, char* buffer, size_t sz )
 
 void d1_send_ack( struct D1Peer* peer, int seqno )
 {
-    /* implement this */
+    D1Packet* packet = (D1Packet*)malloc(1024*sizeof(char));
+    if( packet == NULL ){
+        perror( "malloc" );
+        return;
+    }
+    packet -> header.flags = FLAG_ACK;
+
+    if( seqno == 1){
+        packet -> header.flags |= ACKNO;
+    }
+
+
 }
 
+/*
+custom helper methods:
+ */

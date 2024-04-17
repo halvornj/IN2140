@@ -75,6 +75,7 @@ typedef struct D1Header D1Header;
 #define SEQNO           (1 << 7)
 #define ACKNO           (1 << 0)
 
+
 /** Create a UDP socket that is not bound to any port yet. This is used as a
  *  client port.
  *  Returns the pointer to a structure on the heap in case of success or NULL
