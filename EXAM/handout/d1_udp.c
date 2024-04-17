@@ -14,6 +14,7 @@
 #include "d1_udp.h"
 
 #define D1_UDP_PORT 2311
+#define MAX_PACKET_SIZE 1024*uint8_t
 
 D1Peer* d1_create_client( )
 {
@@ -115,7 +116,8 @@ int d1_send_data( D1Peer* peer, char* buffer, size_t sz )
 
 void d1_send_ack( struct D1Peer* peer, int seqno )
 {
-    D1Packet* packet = (D1Packet*)malloc(1024*sizeof(char));
+    //trying to only send the header for the ack, not the whole packet
+    D1Header* header = (D1Header*)malloc( sizeof(D1Header) )
     if( packet == NULL ){
         perror( "malloc" );
         return;
