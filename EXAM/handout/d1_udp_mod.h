@@ -29,8 +29,8 @@ typedef struct D1Peer D1Peer;
 */
 struct D1Packet
 {
-    struct D1Header header;
-    char*           data;
+    struct D1Header* header;
+    uint8_t*           data;
 };
 typedef struct D1Packet D1Packet;
 

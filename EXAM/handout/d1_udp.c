@@ -117,18 +117,31 @@ int d1_send_data( D1Peer* peer, char* buffer, size_t sz )
 void d1_send_ack( struct D1Peer* peer, int seqno )
 {
     //trying to only send the header for the ack, not the whole packet
-    D1Header* header = (D1Header*)malloc( sizeof(D1Header) )
-    if( packet == NULL ){
+    D1Header* header = (D1Header*)malloc( sizeof(D1Header) );
+    if( header == NULL ){
         perror( "malloc" );
         return;
     }
-    packet -> header.flags = FLAG_ACK;
+    header->flags = FLAG_ACK;   //this is an ack packet
 
-    if( seqno == 1){
-        packet -> header.flags |= ACKNO;
+    if( seqno == 1){    //set the ackno flag if the incoming seqno is 1, else leave it as 0.
+        header ->flags |= ACKNO;
     }
-
-
+    int wc;
+    wc = sendto(
+        peer -> socket,
+        header,
+        sizeof(D1Header),
+        0,
+        (struct sockaddr*)&peer -> addr,
+        sizeof(peer -> addr));
+    if( wc < 0 ){
+        perror( "sendto" );
+        free( header );
+        return;
+    }
+    free( header );
+    return;
 }
 
 /*
