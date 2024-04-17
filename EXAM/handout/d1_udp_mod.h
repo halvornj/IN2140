@@ -21,7 +21,18 @@ struct D1Peer
     int                next_seqno;  /* either 0 or 1, initialized to zero */
 };
 
+
 typedef struct D1Peer D1Peer;
+
+/*
+* my own implemented structs.
+*/
+struct D1Packet
+{
+    struct D1Header header;
+    char*           data;
+};
+typedef struct D1Packet D1Packet;
 
 #endif /* D1_UDP_MOD_H */
 
