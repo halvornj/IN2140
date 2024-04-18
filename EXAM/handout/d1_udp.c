@@ -75,8 +75,13 @@ int d1_get_peer_info( struct D1Peer* peer, const char* peername, uint16_t server
 {
     struct in_addr ip_addr;
     int wc;
+    struct hostent *host_info;
+    host_info = gethostbyname(peername);
+    printf("host_info: %s\n", host_info->h_name);
+
+    /*
     wc = inet_pton(AF_INET, peername, &ip_addr.s_addr);
-    /*ip addr error handling*/
+    ip addr error handling
     if( wc == 0 ){
         fprintf( stderr, "inet_pton failed: invalid address\n" );
         return 0;
@@ -85,8 +90,10 @@ int d1_get_peer_info( struct D1Peer* peer, const char* peername, uint16_t server
         perror("inet_pton");
         return 0;
     }
+   */
+
     /*addr should be good*/
-    peer-> addr.sin_addr = ip_addr;
+    peer-> addr.sin_addr = *((struct in_addr*)host_info->h_addr);
     peer-> addr.sin_port = htons(server_port);
     return 1;
 }
