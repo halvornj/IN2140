@@ -14,7 +14,7 @@
 #include "d1_udp.h"
 
 #define D1_UDP_PORT 2311
-#define MAX_PACKET_SIZE 1024 * uint8_t
+#define MAX_PACKET_SIZE 1024 * sizeof(uint8_t)
 
 D1Peer *d1_create_client()
 {
@@ -108,7 +108,24 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)
 
 int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
-    /* implement this */
+    /*assuming, for now, that sz is the size of *buffer */
+    if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
+    {
+        fprintf(stderr, "error: size of data for data-packet is too large."); // todo double check error output
+        return -1;
+    }
+    D1Packet *packet;
+    packet->header->flags = FLAG_DATA;
+    if (peer->next_seqno)
+    { // set the seqno flag to 1 if the next seqno is 1, otherwise leave it at 0
+        packet->header->flags |= SEQNO;
+    }
+
+    // todo may need an ugly if-else
+    peer->next_seqno = !peer->next_seqno; // this would work for bool behaviour, but this is an int
+
+    // TODO CHECKSUM :(
+
     return 0;
 }
 
