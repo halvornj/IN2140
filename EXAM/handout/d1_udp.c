@@ -103,30 +103,81 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)
      *
      * Implementation is optional.
      */
+
+
+
     return 0;
 }
 
 int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
+    #define PACKET_TOO_LARGE_ERROR -1
+    #define MALLOC_ERROR -2
+    #define SENDTO_ERROR -3
+
     /*assuming, for now, that sz is the size of *buffer */
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
     {
         fprintf(stderr, "error: size of data for data-packet is too large."); // todo double check error output
-        return -1;
+        return PACKET_TOO_LARGE_ERROR;
     }
-    D1Packet *packet;
+    D1Packet *packet = (D1Packet *)malloc(sizeof(D1Packet));    /* allocate memory for the packet*/
+    if (packet == NULL)    /*check that */
+    {
+        perror("malloc");
+        return MALLOC_ERROR;
+    }
+    packet->header = (D1Header *)malloc(sizeof(D1Header));
+    if (packet->header == NULL)
+    {
+        perror("malloc");
+        free(packet);
+        return MALLOC_ERROR;
+    }
     packet->header->flags = FLAG_DATA;
     if (peer->next_seqno)
     { // set the seqno flag to 1 if the next seqno is 1, otherwise leave it at 0
         packet->header->flags |= SEQNO;
     }
 
-    // todo may need an ugly if-else
-    peer->next_seqno = !peer->next_seqno; // this would work for bool behaviour, but this is an int
 
-    // TODO CHECKSUM :(
+    packet->header->size = sz;
+    packet->data = (uint8_t *)malloc(sz); /*allocate memory for the data*/
+    if (packet->data == NULL)
+    {
+        perror("malloc");
+        free(packet->header);
+        free(packet);
+        return MALLOC_ERROR;
+    }
+    memcpy(packet->data, buffer, sz);
+    packet->header->checksum = compute_checksum(packet);
 
-    return 0;
+    int wc;
+    wc = sendto(
+        peer->socket,
+        packet,
+        sizeof(D1Header) + sz,
+        0,
+        (struct sockaddr *)&peer->addr,
+        sizeof(peer->addr));
+
+    if (wc < 0)
+    {
+        perror("sendto");
+        free(packet->header);
+        free(packet->data);
+        free(packet);
+        return SENDTO_ERROR;
+    }
+
+    d1_wait_ack(peer, buffer, sz);
+
+    /*everything should have worked. free everything and return.*/
+    free(packet->header);
+    free(packet->data);
+    free(packet);
+    return wc;
 }
 
 void d1_send_ack(struct D1Peer *peer, int seqno)
@@ -165,3 +216,9 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
 /*
 custom helper methods:
  */
+
+int compute_checksum(D1Packet *packet)
+{
+    // todo
+    return 0;
+}

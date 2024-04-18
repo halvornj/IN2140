@@ -27,12 +27,23 @@ typedef struct D1Peer D1Peer;
 /*
 * my own implemented structs.
 */
+
+/*
+* This is the packet for the communication method that is implemented by the D1
+*/
 struct D1Packet
 {
     struct D1Header* header;
     uint8_t*           data;
 };
 typedef struct D1Packet D1Packet;
+
+/*
+*this is the header for the helper function that computes the checksum of a packet
+ */
+int compute_checksum(D1Packet *packet);
+
+
 
 #endif /* D1_UDP_MOD_H */
 
