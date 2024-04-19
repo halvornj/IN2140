@@ -105,6 +105,7 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, */
      */
     int rc;
     char buff[sizeof(D1Header)];
+    printf("DEBUG: waiting for ack\n");
     rc = recv(peer->socket, buff, sizeof(D1Header), 0);
     if (rc < 0)
     {
@@ -117,7 +118,7 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, */
         printf("ackno: %d, next_seqno: %d. retrying...\n", header->flags & ACKNO, peer->next_seqno);
         d1_send_data(peer, buffer, sz);
     }
-    /*the seqno should match*/
+    /*the seqno should now match*/
     peer->next_seqno = !peer->next_seqno;
     return 1;
 }
@@ -174,7 +175,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         0,
         (struct sockaddr *)&peer->addr,
         sizeof(peer->addr));
-    printf("sent %d bytes\n", wc);
+    printf("DEBUG: sent %d bytes\n", wc);
     if (wc < 0)
     {
         perror("sendto");
@@ -184,7 +185,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         return SENDTO_ERROR;
     }
 
-    //d1_wait_ack(peer, buffer, sz);
+    d1_wait_ack(peer, buffer, sz);
 
     /*everything should have worked. free everything and return.*/
     free(packet->header);
