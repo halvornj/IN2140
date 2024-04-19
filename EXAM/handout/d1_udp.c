@@ -82,8 +82,13 @@ int d1_get_peer_info(struct D1Peer *peer, const char *peername, uint16_t server_
     int wc;
     struct hostent *host_info;
     host_info = gethostbyname(peername);
+    if (host_info == NULL)
+    {
+        perror("gethostbyname");
+        return 0;
+    }
     /*addr should be good*/
-    peer->addr.sin_addr = *((struct in_addr *)host_info->h_addr_list);
+    memcpy(&ip_addr.s_addr, host_info->h_addr_list[0], sizeof(ip_addr.s_addr));
     peer->addr.sin_port = htons(server_port);
     return 1;
 }
@@ -95,14 +100,8 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
     return 0;
 }
 
-int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, */
+int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is the buffer and sz the data buffer? I'm assuming it is, to use recursion*/
 {
-    /* This is meant as a helper function for d1_send_data.
-     * When D1 data has send a packet, this one should wait for the suitable ACK.
-     * If the arriving ACK is wrong, it resends the packet and waits again.
-     *
-     * Implementation is optional.
-     */
     int rc;
     char buff[sizeof(D1Header)];
     printf("DEBUG: waiting for ack\n");
@@ -129,6 +128,8 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     #define MALLOC_ERROR -2
     #define SENDTO_ERROR -3
 
+    printf("DEBUG: sending data: \"%s\", size %zu\n", buffer, sz);
+
     /*assuming, for now, that sz is the size of *buffer */
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
     {
@@ -154,8 +155,8 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         packet->header->flags |= SEQNO;
     }
 
-
     packet->header->size = sz;
+
     packet->data = (uint8_t *)malloc(sz); /*allocate memory for the data*/
     if (packet->data == NULL)
     {
@@ -168,6 +169,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     packet->header->checksum = compute_checksum(packet);
 
     int wc;
+    printf("sending to %s:%d\n", inet_ntoa(peer->addr.sin_addr), ntohs(peer->addr.sin_port));
     wc = sendto(
         peer->socket,
         packet,
