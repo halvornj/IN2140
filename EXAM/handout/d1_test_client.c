@@ -72,8 +72,7 @@ int main( int argc, char* argv[] )
      */
     char* buf = "connect";
     int   sz  = strlen(buf);
-    ret = d1_send_data( clie
-    nt, buf, sz );
+    ret = d1_send_data( client, buf, sz );
     if( ret < 0 )
     {
         d1_delete( client );
