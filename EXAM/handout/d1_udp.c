@@ -85,7 +85,8 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is t
 {
     int rc;
     char buff[sizeof(D1Header)];
-    printf("DEBUG: waiting for ack\n");
+    printf("waiting for ack...\n");
+    //todo add timeout
     rc = recv(peer->socket, buff, sizeof(D1Header), 0);
     if (rc < 0)
     {
@@ -95,8 +96,9 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is t
     D1Header *header = (D1Header *)buff;
     if ((header->flags & ACKNO)!=peer->next_seqno)
     {
-        printf("ackno: %d, next_seqno: %d. retrying...\n", header->flags & ACKNO, peer->next_seqno);
+        printf("recieved ackno: %d, next_seqno is: %d. retrying...\n", header->flags & ACKNO, peer->next_seqno);
         d1_send_data(peer, buffer, sz);
+        return -1;
     }
     /*the seqno should now match*/
     peer->next_seqno = !peer->next_seqno;
@@ -111,7 +113,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     #define CHECKSUM_ERROR -4
     #define SENDTO_ERROR -5
 
-    printf("DEBUG: sending data: \"%s\", size %zu (with header)\n", buffer, sz+sizeof(D1Header));
+    printf("sending data: \"%s\", size %zu (with header)\n", buffer, sz+sizeof(D1Header));
 
     /*assuming, for now, that sz is the size of *buffer */
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
@@ -133,6 +135,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 
     uint8_t *packet = (uint8_t *)calloc(1, sizeof(D1Header) + sz);    /*allocate memory for the packet, should always be at most 1024*/
 
+
     if (packet == NULL)
     {
         perror("calloc");
@@ -142,10 +145,13 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     memcpy(packet, header, sizeof(D1Header));
     memcpy(packet + sizeof(D1Header), buffer, sz);
 
-    header->checksum = compute_checksum(packet, sizeof(D1Header) + sz); /*compute the checksum of the packet when all the relevant data has been filled*/
+    header->checksum = htons(compute_checksum(packet, sizeof(D1Header) + sz)); /*compute the checksum of the packet when all the relevant data has been filled*/
+    memcpy(packet, header, sizeof(D1Header)); /*copy the header back into the packet, to override the 0-checksum*/
+
+
 
     int wc;
-    printf("sending to %s:%d\n", inet_ntoa(peer->addr.sin_addr), ntohs(peer->addr.sin_port));
+    //printf("sending to %s:%d\n", inet_ntoa(peer->addr.sin_addr), ntohs(peer->addr.sin_port));
     wc = sendto(
         peer->socket,
         packet,
@@ -153,7 +159,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         0,
         (struct sockaddr *)&peer->addr,
         sizeof(peer->addr));
-    printf("DEBUG: sent %d bytes\n", wc);
+    printf("sent %d bytes\n", wc);
     if (wc < 0)
     {
         perror("sendto");
@@ -207,8 +213,21 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
 custom helper methods:
  */
 
-int compute_checksum(uint8_t *packet, size_t sz)
+uint16_t compute_checksum(uint8_t *packet, size_t sz)
 {
-    // todo
-    return 0;
+    uint8_t odd = 0;
+    uint8_t even = 0;
+
+    for(int i = 0; i < sz; i++)
+    {
+        if (i % 2 == 0)
+        {
+            even ^= packet[i];
+        }
+        else
+        {
+            odd ^= packet[i];
+        }
+    }
+    return (even << 8) | odd;
 }

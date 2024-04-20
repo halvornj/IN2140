@@ -31,7 +31,7 @@ typedef struct D1Peer D1Peer;
 /*
 *this is the header for the helper function that computes the checksum of a packet
  */
-int compute_checksum(uint8_t *packet, size_t sz);
+uint16_t compute_checksum(uint8_t *packet, size_t sz);
 
 
 
