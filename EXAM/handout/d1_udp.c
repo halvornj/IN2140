@@ -33,32 +33,6 @@ D1Peer *d1_create_client()
         return NULL;
     }
 
-    struct sockaddr_in addr;
-    struct in_addr ip_addr;
-    addr.sin_family = AF_INET;
-    /*defaults to port 2311, todo default to 0, so long as htons() doesn't make a big stink*/
-    addr.sin_port = htons(D1_UDP_PORT);
-
-    int wc;
-    wc = inet_pton(AF_INET, "0.0.0.0", &ip_addr.s_addr);
-    /*ip addr error handling*/
-    if (wc == 0)
-    {
-        fprintf(stderr, "inet_pton failed: invalid address\n");
-        close(peer->socket);
-        free(peer);
-        return NULL;
-    }
-    if (wc < 0)
-    {
-        perror("inet_pton");
-        close(peer->socket);
-        free(peer);
-        return NULL;
-    }
-    addr.sin_addr = ip_addr;
-
-    peer->addr = addr;
     peer->next_seqno = 0;
     return peer;
 }
@@ -78,18 +52,25 @@ D1Peer *d1_delete(D1Peer *peer)
 
 int d1_get_peer_info(struct D1Peer *peer, const char *peername, uint16_t server_port)
 {
+    struct sockaddr_in addr;
     struct in_addr ip_addr;
     int wc;
     struct hostent *host_info;
+
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(D1_UDP_PORT);
     host_info = gethostbyname(peername);
     if (host_info == NULL)
     {
         perror("gethostbyname");
         return 0;
     }
+    ip_addr = *(struct in_addr *)host_info->h_addr_list[0];
+    //todo check if the ip_addr is valid
+    addr.sin_addr = ip_addr;
     /*addr should be good*/
-    memcpy(&ip_addr.s_addr, host_info->h_addr_list[0], sizeof(ip_addr.s_addr));
-    peer->addr.sin_port = htons(server_port);
+    peer->addr = addr;
     return 1;
 }
 
@@ -126,7 +107,9 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
     #define PACKET_TOO_LARGE_ERROR -1
     #define MALLOC_ERROR -2
-    #define SENDTO_ERROR -3
+    #define CALLOC_ERROR -3
+    #define CHECKSUM_ERROR -4
+    #define SENDTO_ERROR -5
 
     printf("DEBUG: sending data: \"%s\", size %zu\n", buffer, sz);
 
@@ -136,28 +119,28 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         fprintf(stderr, "error: size of data for data-packet is too large."); // todo double check error output
         return PACKET_TOO_LARGE_ERROR;
     }
-    D1Packet *packet = (D1Packet *)malloc(sizeof(D1Packet));    /* allocate memory for the packet*/
-    if (packet == NULL)    /*check that */
+    D1Packet *packet = (D1Packet *)calloc(1,sizeof(D1Packet));    /* allocate memory for the packet*/
+    if (packet == NULL)
     {
-        perror("malloc");
-        return MALLOC_ERROR;
+        perror("calloc");
+        return CALLOC_ERROR;
     }
-    packet->header = (D1Header *)malloc(sizeof(D1Header));
+    packet->header = (D1Header *)calloc(1, sizeof(D1Header));
     if (packet->header == NULL)
     {
-        perror("malloc");
+        perror("calloc");
         free(packet);
-        return MALLOC_ERROR;
+        return CALLOC_ERROR;
     }
     packet->header->flags = FLAG_DATA;
     if (peer->next_seqno)
-    { // set the seqno flag to 1 if the next seqno is 1, otherwise leave it at 0
+    { /*set the seqno flag to 1 if the next seqno is 1, otherwise leave it at 0 */
         packet->header->flags |= SEQNO;
     }
 
     packet->header->size = sz;
 
-    packet->data = (uint8_t *)malloc(sz); /*allocate memory for the data*/
+    packet->data = (uint8_t *)calloc(1,sz); /*allocate memory for the data*/
     if (packet->data == NULL)
     {
         perror("malloc");
