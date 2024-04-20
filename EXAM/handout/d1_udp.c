@@ -14,7 +14,7 @@
 #include "d1_udp.h"
 
 #define D1_UDP_PORT 2311
-#define MAX_PACKET_SIZE 1024 * sizeof(uint8_t)
+#define MAX_PACKET_SIZE 1024
 
 D1Peer *d1_create_client()
 {
@@ -111,7 +111,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     #define CHECKSUM_ERROR -4
     #define SENDTO_ERROR -5
 
-    printf("DEBUG: sending data: \"%s\", size %zu\n", buffer, sz);
+    printf("DEBUG: sending data: \"%s\", size %zu (with header)\n", buffer, sz+sizeof(D1Header));
 
     /*assuming, for now, that sz is the size of *buffer */
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
@@ -119,37 +119,30 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         fprintf(stderr, "error: size of data for data-packet is too large."); // todo double check error output
         return PACKET_TOO_LARGE_ERROR;
     }
-    D1Packet *packet = (D1Packet *)calloc(1,sizeof(D1Packet));    /* allocate memory for the packet*/
+    D1Header *header = (D1Header *)calloc(1,sizeof(D1Header));
+    if (header == NULL)
+    {
+        perror("calloc");
+        return CALLOC_ERROR;
+    }
+    header->flags = FLAG_DATA;
+    header->size = sz+sizeof(D1Header);
+    header->size = htonl(header->size); // convert the size to network byte order
+    header->flags |= peer->next_seqno << 7; // set the seqno flag to the next_seqno value in the peer struct
+    header -> flags = htons(header->flags); // convert the flags to network byte order
+
+    uint8_t *packet = (uint8_t *)calloc(1, sizeof(D1Header) + sz);    /*allocate memory for the packet, should always be at most 1024*/
+
     if (packet == NULL)
     {
         perror("calloc");
+        free(header);
         return CALLOC_ERROR;
     }
-    packet->header = (D1Header *)calloc(1, sizeof(D1Header));
-    if (packet->header == NULL)
-    {
-        perror("calloc");
-        free(packet);
-        return CALLOC_ERROR;
-    }
-    packet->header->flags = FLAG_DATA;
-    if (peer->next_seqno)
-    { /*set the seqno flag to 1 if the next seqno is 1, otherwise leave it at 0 */
-        packet->header->flags |= SEQNO;
-    }
+    memcpy(packet, header, sizeof(D1Header));
+    memcpy(packet + sizeof(D1Header), buffer, sz);
 
-    packet->header->size = sz;
-
-    packet->data = (uint8_t *)calloc(1,sz); /*allocate memory for the data*/
-    if (packet->data == NULL)
-    {
-        perror("malloc");
-        free(packet->header);
-        free(packet);
-        return MALLOC_ERROR;
-    }
-    memcpy(packet->data, buffer, sz);
-    packet->header->checksum = compute_checksum(packet);
+    header->checksum = compute_checksum(packet, sizeof(D1Header) + sz); /*compute the checksum of the packet when all the relevant data has been filled*/
 
     int wc;
     printf("sending to %s:%d\n", inet_ntoa(peer->addr.sin_addr), ntohs(peer->addr.sin_port));
@@ -164,8 +157,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     if (wc < 0)
     {
         perror("sendto");
-        free(packet->header);
-        free(packet->data);
+        free(header);
         free(packet);
         return SENDTO_ERROR;
     }
@@ -173,8 +165,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     d1_wait_ack(peer, buffer, sz);
 
     /*everything should have worked. free everything and return.*/
-    free(packet->header);
-    free(packet->data);
+    free(header);
     free(packet);
     return wc;
 }
@@ -216,7 +207,7 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
 custom helper methods:
  */
 
-int compute_checksum(D1Packet *packet)
+int compute_checksum(uint8_t *packet, size_t sz)
 {
     // todo
     return 0;
