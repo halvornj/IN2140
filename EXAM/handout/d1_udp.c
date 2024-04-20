@@ -75,10 +75,48 @@ int d1_get_peer_info(struct D1Peer *peer, const char *peername, uint16_t server_
 }
 
 int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
-{
-    /*TODO checksum*/
+{    /*the comment in d1_udp.h says to return negative numbers in case of error, I'm interpreting wrong checksum or size as errors.*/
+    #define RECVFROM_ERROR -1
+    #define CHECKSUM_ERROR -2
+    #define CALLOC_ERROR -3
 
-    return 0;
+
+    uint8_t *packet = (uint8_t *)calloc(1,MAX_PACKET_SIZE);
+    if (packet == NULL)
+    {
+        perror("calloc");
+        return CALLOC_ERROR;
+    }
+    int rc;
+    rc = recv(peer->socket, packet, MAX_PACKET_SIZE, 0);
+    if (rc < 0)
+    {
+        perror("recv");
+        free(packet);
+        return RECVFROM_ERROR;
+    }
+    D1Header *header = (D1Header *)packet;    /*cast the packet to a D1Header struct, should work because we only cast the first(D1HEADER) bytes?*/
+    if(ntohl(header->size) != rc)    /*check if the size of the packet is the same as the size in the header, converted from network order to host order*/
+    {
+        d1_send_ack(peer, !(header->flags & SEQNO));    /*send an ack with the opposite of the seqno flag, triggers retransmit*/
+        free(packet); /*free the packet and return*/
+        return CHECKSUM_ERROR;
+    }
+
+    if (ntohs(header->checksum) != compute_checksum(packet, rc))
+    {
+        d1_send_ack(peer, !(header->flags & SEQNO));    /*send an ack with the opposite of the seqno flag, triggers retransmit. seqno could also be the peer->seqno.*/
+        free(packet);
+        return CHECKSUM_ERROR;
+    }
+
+    /*the packet should be properly formed, we can now copy the data to the buffer */
+    memcpy(buffer, packet + sizeof(D1Header), rc - sizeof(D1Header));    /*copy the data from the packet to the buffer. we offset the header data in the src*/
+    printf("recieved data: \"%s\", size %lu. acking...\n", buffer, rc - sizeof(D1Header));
+    d1_send_ack(peer, header->flags & SEQNO);    /*send an ack with the seqno flag*/
+    free(packet);
+    return rc - sizeof(D1Header);    /*return the size of the data*/
+
 }
 
 int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is the buffer and sz the data buffer? I'm assuming it is, to use recursion*/
@@ -94,23 +132,33 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is t
         return -1;
     }
     D1Header *header = (D1Header *)buff;
-    if ((header->flags & ACKNO)!=peer->next_seqno)
+    if (!(ntohs(header->flags) & FLAG_ACK))
     {
-        printf("recieved ackno: %d, next_seqno is: %d. retrying...\n", header->flags & ACKNO, peer->next_seqno);
-        d1_send_data(peer, buffer, sz);
-        return -1;
+        printf("WAIT_ACK_ERROR: recieved packet is not an ack. Aborting...\n");
+        return -2;    //todo define the return codes at top
     }
+
+    int incoming_ackno = (ntohs(header->flags) & ACKNO);
+    if (incoming_ackno != peer->next_seqno)
+    {
+        printf("WAIT_ACK_ERROR: recieved ackno: %d, next_seqno is: %d. retrying...\n", incoming_ackno, peer->next_seqno);
+        d1_send_data(peer, buffer, sz);
+    }
+    else{
     /*the seqno should now match*/
     peer->next_seqno = !peer->next_seqno;
+    printf("WAIT_ACK_SUCCESS: ack recieved. new seqno: %d\n",peer->next_seqno);
     return 1;
+    }
+    return -1;
 }
 
 int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
     #define PACKET_TOO_LARGE_ERROR -1
-    #define MALLOC_ERROR -2
+    #define CHECKSUM_ERROR -2
     #define CALLOC_ERROR -3
-    #define CHECKSUM_ERROR -4
+    #define MALLOC_ERROR -4
     #define SENDTO_ERROR -5
 
     printf("sending data: \"%s\", size %zu (with header)\n", buffer, sz+sizeof(D1Header));
@@ -127,9 +175,10 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         perror("calloc");
         return CALLOC_ERROR;
     }
-    header->flags = FLAG_DATA;
     header->size = sz+sizeof(D1Header);
     header->size = htonl(header->size); // convert the size to network byte order
+
+    header->flags = FLAG_DATA;
     header->flags |= peer->next_seqno << 7; // set the seqno flag to the next_seqno value in the peer struct
     header -> flags = htons(header->flags); // convert the flags to network byte order
 
@@ -191,6 +240,8 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
     { // set the ackno flag if the incoming seqno is 1, else leave it as 0.
         header->flags |= ACKNO;
     }
+    header->flags = htons(header->flags);//set to network byte order
+
     int wc;
     wc = sendto(
         peer->socket,
