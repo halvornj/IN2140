@@ -78,7 +78,9 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
 {    /*the comment in d1_udp.h says to return negative numbers in case of error, I'm interpreting wrong checksum or size as errors.*/
     #define RECVFROM_ERROR -1
     #define CHECKSUM_ERROR -2
-    #define CALLOC_ERROR -3
+    #define SIZE_ERROR -3
+    #define CALLOC_ERROR -4
+
 
 
     uint8_t *packet = (uint8_t *)calloc(1,MAX_PACKET_SIZE);
@@ -100,11 +102,17 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
     {
         d1_send_ack(peer, !(header->flags & SEQNO));    /*send an ack with the opposite of the seqno flag, triggers retransmit*/
         free(packet); /*free the packet and return*/
-        return CHECKSUM_ERROR;
+        return SIZE_ERROR;
     }
 
-    if (ntohs(header->checksum) != compute_checksum(packet, rc))
+    uint16_t incoming_checksum = ntohs(header->checksum);
+    header->checksum = 0;    /*set the checksum to 0 to compute the checksum of the packet without the checksum*/
+    uint16_t computed_checksum = compute_checksum(packet, rc);    /*compute the checksum of the packet, without xor-ing the checksum. this allows me to reuse the simple checksum-function i wrote for send.*/
+
+    if (incoming_checksum != computed_checksum)
     {
+        fprintf(stderr, "checksum error. computed checksum: %d, packet checksum: %d\n", compute_checksum(packet, rc), ntohs(header->checksum));
+
         d1_send_ack(peer, !(header->flags & SEQNO));    /*send an ack with the opposite of the seqno flag, triggers retransmit. seqno could also be the peer->seqno.*/
         free(packet);
         return CHECKSUM_ERROR;
@@ -132,7 +140,7 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz)    /*i don't get it, is t
         return -1;
     }
     D1Header *header = (D1Header *)buff;
-    if (!(ntohs(header->flags) & FLAG_ACK))
+    if (!((ntohs(header->flags) & FLAG_ACK)))
     {
         printf("WAIT_ACK_ERROR: recieved packet is not an ack. Aborting...\n");
         return -2;    //todo define the return codes at top
