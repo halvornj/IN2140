@@ -241,6 +241,9 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
         header->flags |= ACKNO;
     }
     header->flags = htons(header->flags);//set to network byte order
+    header ->checksum = htons(compute_checksum((uint8_t *)header, sizeof(D1Header))); // calculate the checksum of the header
+    header->size = htonl(sizeof(D1Header)); // set the size of the packet to the size of the header
+
 
     int wc;
     wc = sendto(
