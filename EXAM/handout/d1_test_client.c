@@ -24,33 +24,34 @@
  * D1 receive functions send a suitable ACK to the server when they receive a packet.
  */
 
-int main( int argc, char* argv[] )
+int main(int argc, char *argv[])
 {
-    if( argc < 3 )
+    if (argc < 3)
     {
-        fprintf( stderr, "Usage %s <host> <port>\n"
-                         "    <host> - name of the server. Can be localhost, a regular name, or an address in dotted decimal.\n"
-                         "    <port> - UDP port the server uses for listening.\n"
-                         "\n", argv[0] );
+        fprintf(stderr, "Usage %s <host> <port>\n"
+                        "    <host> - name of the server. Can be localhost, a regular name, or an address in dotted decimal.\n"
+                        "    <port> - UDP port the server uses for listening.\n"
+                        "\n",
+                argv[0]);
         return -1;
     }
 
-    char*    server_name = argv[1];
-    uint16_t server_port = atoi(argv[2] );
+    char *server_name = argv[1];
+    uint16_t server_port = atoi(argv[2]);
 
     /* Create a suitable data structure to manage the assocation of this client
      * with a server.
      */
-    D1Peer*  client = d1_create_client( );
-    if( ! client )
+    D1Peer *client = d1_create_client();
+    if (!client)
     {
-        printf( "Failed to create D1 client.\n" );
+        printf("Failed to create D1 client.\n");
         return -1;
     }
 
-    printf( "Created D1 client\n" );
+    printf("Created D1 client\n");
 
-    int  ret;
+    int ret;
     char buffer[1024];
 
     /* Discover the address information for the server we want to contact.
@@ -58,11 +59,11 @@ int main( int argc, char* argv[] )
      * client.
      * Otherwise, terminate the client and quit.
      */
-    ret = d1_get_peer_info( client, server_name, server_port );
-    if( ret == 0 )
+    ret = d1_get_peer_info(client, server_name, server_port);
+    if (ret == 0)
     {
-        printf( "Failed to resolve the name for %s:%d\n", server_name, server_port );
-        d1_delete( client );
+        printf("Failed to resolve the name for %s:%d\n", server_name, server_port);
+        d1_delete(client);
         return -1;
     }
 
@@ -70,29 +71,29 @@ int main( int argc, char* argv[] )
      * ACK from the server. If it is the wrong ACK (e.g. the ACKNO flags is 1 although the
      * SEQNO field of our packet was 0), d1_send_data send the packet again.
      */
-    char* buf = "connect";
-    int   sz  = strlen(buf);
-    ret = d1_send_data( client, buf, sz );
-    if( ret < 0 )
+    char *buf = "connect";
+    int sz = strlen(buf);
+    ret = d1_send_data(client, buf, sz);
+    if (ret < 0)
     {
-        d1_delete( client );
+        d1_delete(client);
         return -1;
     }
 
     buf = "ping";
-    sz  = strlen(buf);
+    sz = strlen(buf);
 
-    for( int i=0; i<2; i++ )
+    for (int i = 0; i < 2; i++)
     {
         sleep(1);
 
         /* Send the string "ping". Behaviour as above.
          */
-         printf("DEBUG: sending ping\n");
-        ret = d1_send_data( client, buf, sz );
-        if( ret < 0 )
+        printf("DEBUG: sending ping\n");
+        ret = d1_send_data(client, buf, sz);
+        if (ret < 0)
         {
-            d1_delete( client );
+            d1_delete(client);
             return -1;
         }
 
@@ -101,35 +102,36 @@ int main( int argc, char* argv[] )
          * flag into the ACKNO flag of an ACK packet and send the ACK packet to the
          * server.
          */
-         printf("DEBUG: waiting for pong\n");
-        ret = d1_recv_data( client, buffer, 1000 );
+        printf("DEBUG: waiting for pong\n");
+        ret = d1_recv_data(client, buffer, 1000);
 
-        if( ret < 0 )
+        if (ret < 0)
         {
-            printf( "DEBUG: Failed to receive data from server. Ret was %d\n", ret );
-            d1_delete( client );
+            printf("DEBUG: Failed to receive data from server. Ret was %d\n", ret);
+            d1_delete(client);
             return -1;
         }
 
         buffer[ret] = 0;
-        printf( "%d: Received >>>%s<<<\n", getpid(), buffer );
+        printf("%d: Received >>>%s<<<\n", getpid(), buffer);
     }
 
     /* Send the string "disconnect". Behaviour as above. Expect that the server quits.
      */
     buf = "disconnect";
-    sz  = strlen(buf);
-    ret = d1_send_data( client, buf, sz );
-    if( ret < 0 )
+    sz = strlen(buf);
+    printf("DEBUG: sending disconnect...");
+    ret = d1_send_data(client, buf, sz);
+    if (ret < 0)
     {
-        d1_delete( client );
+        printf("DEBUG: ret of disconnect was %d", ret);
+        d1_delete(client);
         return -1;
     }
 
     /* Delete the D1 data structure and close the socket.
      */
-    client = d1_delete( client );
+    client = d1_delete(client);
 
     return 0;
 }
-
