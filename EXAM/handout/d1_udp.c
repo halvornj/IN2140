@@ -120,7 +120,14 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
     /*the packet should be properly formed, we can now copy the data to the buffer */
     memcpy(buffer, packet + sizeof(D1Header), rc - sizeof(D1Header)); /*copy the data from the packet to the buffer. we offset the header data in the src*/
     printf("recieved data: \"%s\", size %lu. acking...\n", buffer, rc - sizeof(D1Header));
-    d1_send_ack(peer, ntohs(header->flags) & SEQNO); /*send an ack with the seqno flag*/
+
+    int ackno = ntohs(header->flags) & SEQNO;
+    if (ackno) /*the ackno is currently the seqno-flag isolated in the entire flag number, i only want 0 or 1 in an int*/
+    {          /*okay look - could i do this with some bitwise? yes. will i stick to this? also yes*/
+        ackno = 1;
+    }
+
+    d1_send_ack(peer, ackno); /*send an ack with the seqno flag*/
     free(packet);
     return rc - sizeof(D1Header); /*return the size of the data*/
 }
@@ -240,7 +247,7 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
     }
     header->flags = FLAG_ACK; /*this is an ack packet*/
 
-    header->flags |= seqno << 0; /*set the ack number to be the same as the seqno*/
+    header->flags |= (seqno & ACKNO); /*set the ack number to be the same as the seqno*/
 
     header->flags = htons(header->flags);   /*flags in network byte order*/
     header->size = htonl(sizeof(D1Header)); /*set the size of the packet to the size of the header*/
@@ -262,7 +269,7 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
         return;
     }
 
-    printf("sent ACK for seqno: %d, ackno in header: %d.\n", seqno, header->flags & ACKNO);
+    printf("sent ACK for seqno: %d, ackno in header: %d.\n", seqno, ntohs(header->flags & ACKNO));
 
     free(header);
     return;

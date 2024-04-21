@@ -33,3 +33,6 @@ clean:
 	rm -rf *.gch
 
 
+d1_client: clean d1_test_client
+	echo "\n\n\n----------D1_TEST_CLIENT----------\n"
+	./d1_test_client localhost 2311

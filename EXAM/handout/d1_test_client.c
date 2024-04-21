@@ -89,7 +89,6 @@ int main(int argc, char *argv[])
 
         /* Send the string "ping". Behaviour as above.
          */
-        printf("DEBUG: sending ping\n");
         ret = d1_send_data(client, buf, sz);
         if (ret < 0)
         {
@@ -102,12 +101,10 @@ int main(int argc, char *argv[])
          * flag into the ACKNO flag of an ACK packet and send the ACK packet to the
          * server.
          */
-        printf("DEBUG: waiting for pong\n");
         ret = d1_recv_data(client, buffer, 1000);
 
         if (ret < 0)
         {
-            printf("DEBUG: Failed to receive data from server. Ret was %d\n", ret);
             d1_delete(client);
             return -1;
         }
@@ -120,11 +117,9 @@ int main(int argc, char *argv[])
      */
     buf = "disconnect";
     sz = strlen(buf);
-    printf("DEBUG: sending disconnect...");
     ret = d1_send_data(client, buf, sz);
     if (ret < 0)
     {
-        printf("DEBUG: ret of disconnect was %d", ret);
         d1_delete(client);
         return -1;
     }
