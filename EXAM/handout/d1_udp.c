@@ -16,6 +16,14 @@
 #define D1_UDP_PORT 2311
 #define MAX_PACKET_SIZE 1024
 
+#define RECVFROM_ERROR -1
+#define CHECKSUM_ERROR -2
+#define SIZE_ERROR -3
+#define CALLOC_ERROR -4
+#define RECV_BUFFER_TOO_SMALL -5
+#define SEND_PACKET_TOO_LARGE_ERROR -6
+#define SENDTO_ERROR -7
+
 D1Peer *d1_create_client()
 {
     D1Peer *peer = (D1Peer *)malloc(sizeof(D1Peer));
@@ -54,11 +62,10 @@ int d1_get_peer_info(struct D1Peer *peer, const char *peername, uint16_t server_
 {
     struct sockaddr_in addr;
     struct in_addr ip_addr;
-    int wc;
     struct hostent *host_info;
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(D1_UDP_PORT);
+    addr.sin_port = htons(server_port);
     host_info = gethostbyname(peername);
     if (host_info == NULL)
     {
@@ -75,10 +82,6 @@ int d1_get_peer_info(struct D1Peer *peer, const char *peername, uint16_t server_
 
 int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
 { /*the comment in d1_udp.h says to return negative numbers in case of error, I'm interpreting wrong checksum or size as errors.*/
-#define RECVFROM_ERROR -1
-#define CHECKSUM_ERROR -2
-#define SIZE_ERROR -3
-#define CALLOC_ERROR -4
 
     uint8_t *packet = (uint8_t *)calloc(1, MAX_PACKET_SIZE);
     if (packet == NULL)
@@ -97,7 +100,7 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
     D1Header *header = (D1Header *)packet; /*cast the packet to a D1Header struct, should work because we only cast the first(D1HEADER) bytes?*/
 
     /*check the size of the packet matches the size in the headerø*/
-    if (ntohl(header->size) != rc) /*check if the size of the packet is the same as the size in the header, converted from network order to host order*/
+    if ((int)ntohl(header->size) != rc) /*check if the size of the packet is the same as the size in the header, converted from network order to host order*/
     {
         d1_send_ack(peer, !(header->flags & SEQNO)); /*send an ack with the opposite of the seqno flag, triggers retransmit*/
         free(packet);                                /*free the packet and return*/
@@ -118,8 +121,14 @@ int d1_recv_data(struct D1Peer *peer, char *buffer, size_t sz)
     }
 
     /*the packet should be properly formed, we can now copy the data to the buffer */
+    /*first, check that the buffer is large enough, just for safety :)*/
+    if (sz < (rc - sizeof(D1Header)))
+    {
+        fprintf(stderr, "Error: the buffer passed to the recv_data was not large enough to hold the data. quitting...");
+        free(packet);
+        return (RECV_BUFFER_TOO_SMALL);
+    }
     memcpy(buffer, packet + sizeof(D1Header), rc - sizeof(D1Header)); /*copy the data from the packet to the buffer. we offset the header data in the src*/
-    printf("recieved data: \"%s\", size %lu. acking...\n", buffer, rc - sizeof(D1Header));
 
     int ackno = ntohs(header->flags) & SEQNO;
     if (ackno) /*the ackno is currently the seqno-flag isolated in the entire flag number, i only want 0 or 1 in an int*/
@@ -169,11 +178,6 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz) /*i don't get it, is the 
 
 int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
-#define PACKET_TOO_LARGE_ERROR -1
-#define CHECKSUM_ERROR -2
-#define CALLOC_ERROR -3
-#define MALLOC_ERROR -4
-#define SENDTO_ERROR -5
 
     printf("sending data: \"%s\", size %zu (with header)\n", buffer, sz + sizeof(D1Header));
 
@@ -181,7 +185,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
     {
         fprintf(stderr, "error: size of data for data-packet is too large."); // todo double check error output
-        return PACKET_TOO_LARGE_ERROR;
+        return SEND_PACKET_TOO_LARGE_ERROR;
     }
     D1Header *header = (D1Header *)calloc(1, sizeof(D1Header));
     if (header == NULL)
@@ -189,6 +193,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         perror("calloc");
         return CALLOC_ERROR;
     }
+
     header->size = sz + sizeof(D1Header);
     header->size = htonl(header->size); // convert the size to network byte order
 
@@ -284,7 +289,7 @@ uint16_t compute_checksum(uint8_t *packet, size_t sz)
     uint8_t odd = 0;
     uint8_t even = 0;
 
-    for (int i = 0; i < sz; i++)
+    for (size_t i = 0; i < sz; i++)
     {
         if (i % 2 == 0)
         {
