@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <errno.h>
 
 #include "d1_udp.h"
 
@@ -23,6 +24,7 @@
 #define RECV_BUFFER_TOO_SMALL -5
 #define SEND_PACKET_TOO_LARGE_ERROR -6
 #define SENDTO_ERROR -7
+#define WAIT_ACK_ERROR -8
 
 D1Peer *d1_create_client()
 {
@@ -145,13 +147,28 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz) /*i don't get it, is the 
 {
     int rc;
     char buff[sizeof(D1Header)];
-    printf("waiting for ack...\n");
+
     // todo add timeout
+    struct timeval tv;
+    tv.tv_sec = 1;  // 1 second timeout
+    tv.tv_usec = 0; // 0 microseconds
+    if (setsockopt(peer->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+        perror("Error");
+    }
+
+    printf("waiting for ack...\n");
+
     rc = recv(peer->socket, buff, sizeof(D1Header), 0);
     if (rc < 0)
     {
-        perror("recv");
-        return -1;
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {    /*timeout occurred: with the setsockopt() the recv will return -1 and set errno to EAGAIN or EWOULDBLOCK (idk what these are, but thats the documentation so...*/
+            printf("Timeout occurred while waiting for ACK, resending data...\n");
+            d1_send_data(peer, buffer, sz);
+            return d1_wait_ack(peer, buffer, sz);
+        } else {
+            perror("recv");
+            return -1;
+        }
     }
     D1Header *header = (D1Header *)buff;
     if (!((ntohs(header->flags) & FLAG_ACK)))
@@ -293,12 +310,12 @@ uint16_t compute_checksum(uint8_t *packet, size_t sz)
     {
         if (i % 2 == 0)
         {
-            even ^= packet[i];
+            odd ^= packet[i];
         }
         else
         {
-            odd ^= packet[i];
+            even ^= packet[i];
         }
     }
-    return (even << 8) | odd;
+    return (odd << 8) | even;
 }
