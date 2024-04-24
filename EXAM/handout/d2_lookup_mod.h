@@ -17,9 +17,8 @@ typedef struct D2Client D2Client;
 struct LocalTreeStore
 {
     int number_of_nodes;
+    struct NetNode* nodes;    /* I think I'm gonna go for an array of nodes */
 };
-
 typedef struct LocalTreeStore LocalTreeStore;
 
 #endif /* D2_LOOKUP_MOD_H */
-
