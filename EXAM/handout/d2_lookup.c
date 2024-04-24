@@ -12,6 +12,7 @@
 #define ID_TOO_LOW_ERROR -1
 #define SEND_ERROR -2
 #define NON_MATCHING_PACKET_TYPE -3
+#define TOO_MANY_NODES -4
 
 D2Client* d2_client_create( const char* server_name, uint16_t server_port )
 {
@@ -28,7 +29,11 @@ D2Client* d2_client_create( const char* server_name, uint16_t server_port )
         free(client);
         return NULL;
     }
-    if(d1_get_peer_info(client->peer, server_name, server_port) ==0){
+    if(d1_get_peer_info(client->peer, server_name, server_port) ==0)
+    {
+        /*uhhh do i free here? suppose i do innit*/
+        d1_delete(client->peer);
+        free(client);
         return NULL;
     }
     return client;
@@ -45,25 +50,28 @@ D2Client* d2_client_delete( D2Client* client )
 
 int d2_send_request( D2Client* client, uint32_t id )
 {
-    if(id < 1000){
+    if(id < 1000)
+    {
         fprintf(stderr, "error: id %d for d2_send_request must be over 1000", id);
         return ID_TOO_LOW_ERROR;
     }
 
     PacketRequest * reqpacket = (PacketRequest*) calloc(1, sizeof(PacketRequest));
-
     reqpacket ->type = htons(TYPE_REQUEST);
     reqpacket ->id = htonl(id);
 
-    char *outbuffr;
+    char *outbuffr = (char*) malloc(sizeof(PacketRequest));
     memcpy(reqpacket, outbuffr, sizeof(PacketRequest));
 
     int rc;
     rc = d1_send_data(client->peer, outbuffr, sizeof(PacketRequest));
-    if(rc < 0){
+    if(rc < 0)
+    {
         return SEND_ERROR;
     }
     /*things should be good)*/
+    free(reqpacket);
+    free(outbuffr);
     return 1;
 }
 
@@ -75,22 +83,24 @@ int d2_recv_response_size( D2Client* client )
         return rc;
     }
     PacketHeader * header = (PacketHeader*)buffer;    /*cast buffer to header first to check type*/
-    if(ntohs(header->type) != TYPE_RESPONSE_SIZE){
+    if(ntohs(header->type) != TYPE_RESPONSE_SIZE)
+    {
         fprintf(stderr, "error: expected response size packet, got something else");
         free(buffer);
-        free(header);
         return NON_MATCHING_PACKET_TYPE;
     }
-    free(header); /*free header, because we don't need it anymore*/
     /*cast buffer to PacketResponseSize, because we know that's the type from the header*/
     PacketResponseSize * responsePacket = (PacketResponseSize*)buffer;
-    return ntohs(responsePacket->size);
+    uint16_t size = ntohs(responsePacket->size);
+    free(buffer);
+    return size;
 }
 
 int d2_recv_response( D2Client* client, char* buffer, size_t sz )/*if i remember correctly i handle buffer size errors in d1*/
 {
     int rc = d1_recv_data(client->peer, buffer, sz);
-    if(rc < 0){
+    if(rc < 0)
+    {
         return rc;
     }
     PacketHeader * header = (PacketHeader*)buffer;
@@ -98,39 +108,80 @@ int d2_recv_response( D2Client* client, char* buffer, size_t sz )/*if i remember
         fprintf(stderr, "error: expected response packet, got something else");
         return NON_MATCHING_PACKET_TYPE;
     }
+    free(header);
     return rc;
 }
 
 LocalTreeStore* d2_alloc_local_tree( int num_nodes )
 {
-    LocalTreeStore* store = (LocalTreeStore*)malloc(sizeof(LocalTreeStore));
-    if(!store){
+    LocalTreeStore* tree = (LocalTreeStore*)malloc(sizeof(LocalTreeStore));
+    if(!tree)
+    {
         perror("malloc");
         return NULL;
     }
-    store->number_of_nodes = num_nodes;
-    store->nodes = (NetNode*)calloc(num_nodes, sizeof(NetNode));
-    if(!store->nodes){
+    tree->number_of_nodes = num_nodes;
+    tree->nodes = (NetNode*)calloc(num_nodes, sizeof(NetNode));
+    if(!tree->nodes)
+    {
         perror("calloc");
-        free(store);
+        free(tree);
         return NULL;
     }
-    return store;
+    return tree;
 }
 
-void  d2_free_local_tree( LocalTreeStore* nodes )
+void  d2_free_local_tree( LocalTreeStore* tree )
 {
-    /* implement this */
+    free(tree->nodes);
+    free(tree);
 }
+
 
 int d2_add_to_local_tree( LocalTreeStore* nodes_out, int node_idx, char* buffer, int buflen )
 {
-    /* implement this */
-    return 0;
+    int num_nodes = (buflen - sizeof(PacketResponse)) / sizeof(NetNode);
+    if(num_nodes > 5)
+    {
+        fprintf(stderr, "error: too many nodes in buffer");
+        return TOO_MANY_NODES;
+    }
+    for(int i = node_idx; i < num_nodes+node_idx; i++)
+    {
+        NetNode * node = (NetNode*)calloc(1, sizeof(NetNode));
+        if(!node)
+        {
+            perror("calloc");
+            return -1;
+        }
+
+        /*for writing purposes: first create the node, then add the nod to the tree*/
+        memcpy(node, buffer, sizeof(NetNode));
+        /*host order all the node values*/
+        node->id = ntohl(node->id);
+        node->value = ntohl(node->value);
+        node->num_children = ntohl(node->num_children);
+        /*host order all the child ids*/
+        for(uint32_t j = 0; j < node->num_children; j++)
+        {
+            node->child_id[j] = ntohl(node->child_id[j]);
+        }
+        nodes_out->nodes[i] = (*node);
+        buffer += sizeof(NetNode);    /*move buffer to the next node*/
+    }
+    return node_idx + num_nodes;
 }
 
 void d2_print_tree( LocalTreeStore* nodes_out )
 {
-    /* implement this */
+    for(int i = 0; i < nodes_out->number_of_nodes; i++)
+    {
+        printf("id %d value %d children %d\n", nodes_out->nodes[i].id, nodes_out->nodes[i].value, nodes_out->nodes[i].num_children);
+        for(uint32_t j = 0; j < nodes_out->nodes[i].num_children; j++)
+        {
+            printf("--");
+        }
+        printf("\n");
+    }
 }
 

@@ -15,7 +15,6 @@
     <list default="true" id="b3a559c9-240f-4090-b99d-37c8bb12241b" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/handout/d2_lookup.c" beforeDir="false" afterPath="$PROJECT_DIR$/handout/d2_lookup.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/handout/d2_lookup_mod.h" beforeDir="false" afterPath="$PROJECT_DIR$/handout/d2_lookup_mod.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -170,7 +169,7 @@
       <workItem from="1713960026037" duration="7313000" />
       <workItem from="1713972194131" duration="3619000" />
       <workItem from="1713975893248" duration="326000" />
-      <workItem from="1713976240093" duration="16000" />
+      <workItem from="1713976240093" duration="4234000" />
     </task>
     <servers />
   </component>
