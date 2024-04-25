@@ -118,7 +118,8 @@ int d2_recv_response_size(D2Client *client)
 
 int d2_recv_response(D2Client *client, char *buffer, size_t sz) /*if i remember correctly i handle buffer size errors in d1*/
 {
-    int rc = d1_recv_data(client->peer, buffer, sz);
+    int rc;
+    rc = d1_recv_data(client->peer, buffer, sz);
     if (rc < 0)
     {
         return rc;
@@ -129,13 +130,7 @@ int d2_recv_response(D2Client *client, char *buffer, size_t sz) /*if i remember 
         fprintf(stderr, "error: expected response packet, got something else");
         return NON_MATCHING_PACKET_TYPE;
     }
-    /*
-    fprintf(stderr, "AY CARAMBA START\n");
-    //------------------ERROR IS AFTER THIS POINT----------
-    // free(buffer);
-    fprintf(stderr, "AY CARAMBA END \n");
-    //-----------------ERROR IS BEFORE THIS POINT---------
-    */
+
     return rc;
 }
 
@@ -192,13 +187,22 @@ int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, 
 
 void d2_print_tree(LocalTreeStore *nodes_out)
 {
+    int dashcount = 0;
     for (int i = 0; i < nodes_out->number_of_nodes; i++)
     {
-        printf("id %d value %d children %d\n", nodes_out->nodes[i].id, nodes_out->nodes[i].value, nodes_out->nodes[i].num_children);
-        for (uint32_t j = 0; j < nodes_out->nodes[i].num_children; j++)
+        NetNode currentNode = nodes_out->nodes[i];
+        for (int j = 0; j < dashcount; j++)
         {
-            printf("--");
+            printf("-");
         }
-        printf("\n");
+        printf("id %d value %d children %d\n", currentNode.id, currentNode.value, currentNode.num_children);
+        if (currentNode.num_children > 0)
+        {
+            dashcount += 2;
+        }
+        else
+        {
+            dashcount -= 2;
+        }
     }
 }
