@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
@@ -152,20 +153,24 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz) /*i don't get it, is the 
     struct timeval tv;
     tv.tv_sec = 1;  // 1 second timeout
     tv.tv_usec = 0; // 0 microseconds
-    if (setsockopt(peer->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+    if (setsockopt(peer->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+    {
         perror("Error");
     }
 
-    //printf("waiting for ack...\n");
+    // printf("waiting for ack...\n");
 
     rc = recv(peer->socket, buff, sizeof(D1Header), 0);
     if (rc < 0)
     {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {    /*timeout occurred: with the setsockopt() the recv will return -1 and set errno to EAGAIN or EWOULDBLOCK (idk what these are, but thats the documentation so...*/
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        { /*timeout occurred: with the setsockopt() the recv will return -1 and set errno to EAGAIN or EWOULDBLOCK (idk what these are, but thats the documentation so...*/
             fprintf(stderr, "Timeout occurred while waiting for ACK, resending data...\n");
             d1_send_data(peer, buffer, sz);
             return d1_wait_ack(peer, buffer, sz);
-        } else {
+        }
+        else
+        {
             perror("recv");
             return -1;
         }
@@ -187,7 +192,7 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz) /*i don't get it, is the 
     {
         /*the seqno should now match*/
         peer->next_seqno = !peer->next_seqno;
-        //printf("WAIT_ACK_SUCCESS: ack recieved. new seqno: %d\n", peer->next_seqno);
+        // printf("WAIT_ACK_SUCCESS: ack recieved. new seqno: %d\n", peer->next_seqno);
         return 1;
     }
     return -1;
@@ -196,7 +201,7 @@ int d1_wait_ack(D1Peer *peer, char *buffer, size_t sz) /*i don't get it, is the 
 int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
 {
 
-    //printf("sending data: \"%s\", size %zu (with header)\n", buffer, sz + sizeof(D1Header));
+    // printf("sending data: \"%s\", size %zu (with header)\n", buffer, sz + sizeof(D1Header));
 
     /*assuming, for now, that sz is the size of *buffer */
     if (sz > (MAX_PACKET_SIZE - sizeof(D1Header))) // if the size of the incomming buffer is greater than the max packet size minus the header size
@@ -241,7 +246,7 @@ int d1_send_data(D1Peer *peer, char *buffer, size_t sz)
         0,
         (struct sockaddr *)&peer->addr,
         sizeof(peer->addr));
-    //printf("sent %d bytes\n", wc);
+    // printf("sent %d bytes\n", wc);
     if (wc < 0)
     {
         perror("sendto");
@@ -291,7 +296,7 @@ void d1_send_ack(struct D1Peer *peer, int seqno)
         return;
     }
 
-    //printf("sent ACK for seqno: %d, ackno in header: %d.\n", seqno, ntohs(header->flags & ACKNO));
+    // printf("sent ACK for seqno: %d, ackno in header: %d.\n", seqno, ntohs(header->flags & ACKNO));
 
     free(header);
     return;
