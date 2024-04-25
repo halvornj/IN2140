@@ -129,10 +129,11 @@ int d2_recv_response(D2Client *client, char *buffer, size_t sz) /*if i remember 
         fprintf(stderr, "error: expected response packet, got something else");
         return NON_MATCHING_PACKET_TYPE;
     }
+    free(buffer);
     /*
     fprintf(stderr, "AY CARAMBA START\n");
     //------------------ERROR IS AFTER THIS POINT----------
-    // free(buffer);
+    free(buffer);
     fprintf(stderr, "AY CARAMBA END \n");
     //-----------------ERROR IS BEFORE THIS POINT---------
     */
