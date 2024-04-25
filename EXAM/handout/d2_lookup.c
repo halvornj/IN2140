@@ -155,7 +155,7 @@ LocalTreeStore *d2_alloc_local_tree(int num_nodes)
 
 void d2_free_local_tree(LocalTreeStore *tree)
 {
-    free(tree->nodes);
+    free(tree->nodes); /*free the children!*/
     free(tree);
 }
 
@@ -187,6 +187,7 @@ int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, 
 
 void d2_print_tree(LocalTreeStore *nodes_out)
 {
+    int outstanding_children = 0;
     int dashcount = 0;
     for (int i = 0; i < nodes_out->number_of_nodes; i++)
     {
