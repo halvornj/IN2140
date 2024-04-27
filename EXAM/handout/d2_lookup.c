@@ -205,28 +205,31 @@ int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, 
     }
     return node_idx;
 }
-
-void d2_print_tree(LocalTreeStore *nodes_out)
+void print_node(LocalTreeStore* tree, uint32_t node_id, int level)
 {
-    d2_print_node(nodes_out->nodes, 0);
-}
-
-NetNode* d2_print_node(NetNode* array, int depth){
-    sleep(1);
-    NetNode *node = (NetNode *)array;
-    for (int i = 0; i < depth; i++)
-    {
-        printf("--");
+    /*Find the node with the given id in the tree. In theory it should be directly following, but i couldn't get it to work.*/
+    NetNode* node = NULL;
+    for (int i = 0; i < tree->number_of_nodes; i++) {
+        if (tree->nodes[i].id == node_id) {
+            node = &tree->nodes[i];
+            break;
+        }
     }
+
+    /*If the node was not found, return */
+    if (!node) return;
+
+    /*Print the node details with the appropriate indentation */
+    for (int i = 0; i < level; i++) printf("--");
     //printf("id %d value %d children %d\n", node->id, node->value, node->num_children);
     printf("%d\n", node->value);
-    array = array + sizeof(NetNode);
-    if(node->num_children == 0){
-        return array;
+    /* For each child of the current node, call this function recursively with an increased indentation level */
+    for (uint32_t i = 0; i < node->num_children; i++) {
+        print_node(tree, node->child_id[i], level + 1);
     }
-    for (uint32_t i = 0; i < node->num_children; i++)
-    {
-        array = d2_print_node(array,depth+1);
-    }
-    return array;
+}
+
+void d2_print_tree(LocalTreeStore* tree) {
+    /* Start from the root node (node with id 0) and call the helper function with indentation level 0 */
+    print_node(tree, 0, 0);
 }

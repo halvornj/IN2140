@@ -21,6 +21,5 @@ struct LocalTreeStore
 };
 typedef struct LocalTreeStore LocalTreeStore;
 
-
-struct NetNode* d2_print_node(struct NetNode* array, int depth);
+void print_node(LocalTreeStore* tree, uint32_t node_id, int level);
 #endif /* D2_LOOKUP_MOD_H */

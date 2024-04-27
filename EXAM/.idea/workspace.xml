@@ -13,7 +13,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b3a559c9-240f-4090-b99d-37c8bb12241b" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/handout/d2_lookup.c" beforeDir="false" afterPath="$PROJECT_DIR$/handout/d2_lookup.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/handout/d2_lookup_mod.h" beforeDir="false" afterPath="$PROJECT_DIR$/handout/d2_lookup_mod.h" afterDir="false" />
     </list>
