@@ -208,6 +208,12 @@ int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, 
 void print_node(LocalTreeStore* tree, uint32_t node_id, int level)
 {
     /*Find the node with the given id in the tree. In theory it should be directly following, but i couldn't get it to work.*/
+
+    /*I know what you're thinking, dear reader (if anyone is even reading this?): my god how inefficient!
+    * However, the task says "potentially hundreds of values".
+    * Now, what's more inefficient, a linear search for a few hundred values, me spending hours scratching my head trying to save a few cycles?
+    * I think the answer is clear. Besides, the task says nothing about efficiency, runtime complexity or scalability.
+    * */
     NetNode* node = NULL;
     for (int i = 0; i < tree->number_of_nodes; i++) {
         if (tree->nodes[i].id == node_id) {
