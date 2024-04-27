@@ -168,49 +168,65 @@ void d2_free_local_tree(LocalTreeStore *tree)
 
 int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, int buflen)
 {
-    int num_nodes = (buflen - sizeof(PacketResponse)) / sizeof(NetNode);
-    if (num_nodes > 5)
-    {
-        fprintf(stderr, "error: too many nodes in buffer");
-        return TOO_MANY_NODES;
+    int num_nodes = buflen / 3*sizeof(uint32_t);
+    if (num_nodes >5){
+        num_nodes = 5;
     }
-    for (int i = node_idx; i < num_nodes + node_idx; i++)
+    for (int i = 0; i < num_nodes; i++)
     {
-        NetNode *node = (NetNode *)buffer; /*read the first netNode-size bytes from buffer and use as netnode*/
-        /*host order all the node values*/
-        node->id = ntohl(node->id);
-        node->value = ntohl(node->value);
-        node->num_children = ntohl(node->num_children);
+        NetNode *node = (NetNode *) calloc(1, sizeof(NetNode));
+        /*first 4 bytes are id, next 4 bytes are value, next 4 bytes are num_children*/
+        /*because the child-id[]-length is variable, I've chosen to advance the buffer for every read, just to make it crystal clear.
+        I could advance it the (num_children+3)*sizeof(uint32_t), but this makes it clear i read, and then advance the buffer*/
+        uint32_t id;
+        memcpy(&id, buffer, sizeof(uint32_t));
+        buffer += sizeof(uint32_t);
+        uint32_t value;
+        memcpy(&value, buffer, sizeof(uint32_t));
+        buffer += sizeof(uint32_t);
+        uint32_t num_children;
+        memcpy(&num_children, buffer, sizeof(uint32_t));
+        buffer += sizeof(uint32_t);
+
+        node->id = ntohl(id);
+        node->value = ntohl(value);
+        node->num_children = ntohl(num_children);
+        //printf("DEBUG:host order: id = %d, value= %d, num_children=%d\n", node->id,node->value, node->num_children);
         /*host order all the child ids*/
         for (uint32_t j = 0; j < node->num_children; j++)
         {
+            memcpy(&node->child_id[j], buffer, sizeof(uint32_t));
+            buffer += sizeof(uint32_t);
             node->child_id[j] = ntohl(node->child_id[j]);
         }
-        nodes_out->nodes[i] = (*node);
-        buffer += sizeof(NetNode); /*move buffer to the next node*/
+        nodes_out->nodes[node_idx] = (*node);
+        node_idx++;
+        free(node);
     }
-    return node_idx + num_nodes;
+    return node_idx;
 }
 
 void d2_print_tree(LocalTreeStore *nodes_out)
 {
-    int outstanding_children = 0;
-    int dashcount = 0;
-    for (int i = 0; i < nodes_out->number_of_nodes; i++)
+    d2_print_node(nodes_out->nodes, 0);
+}
+
+NetNode* d2_print_node(NetNode* array, int depth){
+    sleep(1);
+    NetNode *node = (NetNode *)array;
+    for (int i = 0; i < depth; i++)
     {
-        NetNode currentNode = nodes_out->nodes[i];
-        for (int j = 0; j < dashcount; j++)
-        {
-            printf("-");
-        }
-        printf("id %d value %d children %d\n", currentNode.id, currentNode.value, currentNode.num_children);
-        if (currentNode.num_children > 0)
-        {
-            dashcount += 2;
-        }
-        else
-        {
-            dashcount -= 2;
-        }
+        printf("--");
     }
+    //printf("id %d value %d children %d\n", node->id, node->value, node->num_children);
+    printf("%d\n", node->value);
+    array = array + sizeof(NetNode);
+    if(node->num_children == 0){
+        return array;
+    }
+    for (uint32_t i = 0; i < node->num_children; i++)
+    {
+        array = d2_print_node(array,depth+1);
+    }
+    return array;
 }
