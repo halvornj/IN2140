@@ -308,6 +308,7 @@ custom helper methods:
 
 uint16_t compute_checksum(uint8_t *packet, size_t sz)
 {
+    /*ChecksumExplanation.md uses 1-indexing when reffering to the buffer, so I'm using the same here.*/
     uint8_t odd = 0;
     uint8_t even = 0;
 

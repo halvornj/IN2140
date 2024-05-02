@@ -52,7 +52,7 @@ D2Client *d2_client_delete(D2Client *client)
 
 int d2_send_request(D2Client *client, uint32_t id)
 {
-    if (id < 1000)
+    if (id <= 1000)
     {
         fprintf(stderr, "error: id %d for d2_send_request must be over 1000", id);
         return ID_TOO_LOW_ERROR;
@@ -85,6 +85,9 @@ int d2_send_request(D2Client *client, uint32_t id)
     rc = d1_send_data(client->peer, outbuffr, sizeof(PacketRequest));
     if (rc < 0)
     {
+        perror("sendto");
+        free(reqpacket);
+        free(outbuffr);
         return SEND_ERROR;
     }
     /*things should be good)*/
@@ -130,14 +133,6 @@ int d2_recv_response(D2Client *client, char *buffer, size_t sz) /*if i remember 
         fprintf(stderr, "error: expected response packet, got something else");
         return NON_MATCHING_PACKET_TYPE;
     }
-    //free(buffer);
-    /*
-    fprintf(stderr, "AY CARAMBA START\n");
-    //------------------ERROR IS AFTER THIS POINT----------
-    free(buffer);
-    fprintf(stderr, "AY CARAMBA END \n");
-    //-----------------ERROR IS BEFORE THIS POINT---------
-    */
     return rc;
 }
 
@@ -207,20 +202,8 @@ int d2_add_to_local_tree(LocalTreeStore *nodes_out, int node_idx, char *buffer, 
 }
 void print_node(LocalTreeStore* tree, uint32_t node_id, int level)
 {
-    /*Find the node with the given id in the tree. In theory it should be directly following, but i couldn't get it to work.*/
-
-    /*I know what you're thinking, dear reader (if anyone is even reading this?): my god how inefficient!
-    * However, the task says "potentially hundreds of values".
-    * Now, what's more inefficient, a linear search for a few hundred values, me spending hours scratching my head trying to save a few cycles?
-    * I think the answer is clear. Besides, the task says nothing about efficiency, runtime complexity or scalability.
-    * */
-    NetNode* node = NULL;
-    for (int i = 0; i < tree->number_of_nodes; i++) {
-        if (tree->nodes[i].id == node_id) {
-            node = &tree->nodes[i];
-            break;
-        }
-    }
+    /*Find the node with the given id in the tree. Because id-s are assigned by dfs, index == id. actually a pretty neat map*/
+    NetNode* node = &tree->nodes[node_id];
 
     /*If the node was not found, return */
     if (!node) return;
@@ -228,7 +211,7 @@ void print_node(LocalTreeStore* tree, uint32_t node_id, int level)
     /*Print the node details with the appropriate indentation */
     for (int i = 0; i < level; i++) printf("--");
     //printf("id %d value %d children %d\n", node->id, node->value, node->num_children);
-    printf("%d\n", node->value);
+    printf("id %d value %d children %d\n", node->id, node->value, node->num_children);
     /* For each child of the current node, call this function recursively with an increased indentation level */
     for (uint32_t i = 0; i < node->num_children; i++) {
         print_node(tree, node->child_id[i], level + 1);
